@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>משחק זיכרון ❤️</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>משחק זיכרון ❤️</h1>
+
+  <div id="hud">
+    <span id="attempts-display">ניסיונות: 0</span>
+    <span id="timer-display">זמן: 00:00</span>
+  </div>
+
+  <div id="board"></div>
+
+  <canvas id="fireworks"></canvas>
+
+  <div id="victory" class="hidden">
+    <p id="victory-message"></p>
+    <button id="play-again">שחק שוב</button>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
