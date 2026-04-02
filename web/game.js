@@ -6,13 +6,14 @@ const CONFIG = {
   rows: 2,
   cols: 5,
   flipDelay: 800, // ms before non-matching cards flip back
-  // Paths to card face images (must have exactly numPairs entries)
+  // Paths to card face images (must have exactly numPairs entries).
+  // Any extension works: .jpg, .jpeg, .png, .gif, .bmp, .jfif
   imagePaths: [
-    "images/1.jpg",
-    "images/2.jpg",
-    "images/3.jpg",
-    "images/4.jpg",
-    "images/5.jpg",
+    "images/1.jfif",
+    "images/2.jfif",
+    "images/3.jfif",
+    "images/4.jfif",
+    "images/5.jfif",
   ],
   cardBackPath: "images/back.png",
   victoryMessage: (steps, time) =>
@@ -64,6 +65,10 @@ class MemoryGame {
     this._attemptsEl.textContent = "ניסיונות: 0";
     this._timerEl.textContent    = "זמן: 00:00";
     this._victoryEl.classList.add("hidden");
+
+    // Clear any leftover fireworks
+    const fw = document.getElementById("fireworks");
+    fw.getContext("2d").clearRect(0, 0, fw.width, fw.height);
 
     this._renderBoard();
 
@@ -160,7 +165,81 @@ class MemoryGame {
 
     this._victoryMsgEl.textContent = CONFIG.victoryMessage(this._attempts, timeStr);
     this._victoryEl.classList.remove("hidden");
+    launchFireworks();
   }
+}
+
+
+// ================================
+// Fireworks
+// ================================
+function launchFireworks() {
+  const canvas = document.getElementById("fireworks");
+  const ctx    = canvas.getContext("2d");
+  let particles = [];
+  let rafId;
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  function randomColor() {
+    const colors = ["#FF6B6B","#FFD700","#7EFFF5","#FF85E1","#A8FF78","#FFA500","#FFFFFF"];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  function burst() {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height * 0.6;
+    const color = randomColor();
+    const count = 80 + Math.floor(Math.random() * 60);
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count;
+      const speed = 2 + Math.random() * 5;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        alpha: 1,
+        color,
+        radius: 2 + Math.random() * 2,
+      });
+    }
+  }
+
+  // Fire a burst every 600 ms
+  burst();
+  const burstId = setInterval(burst, 600);
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.x     += p.vx;
+      p.y     += p.vy;
+      p.vy    += 0.08;   // gravity
+      p.vx    *= 0.98;   // drag
+      p.alpha -= 0.012;
+      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    particles = particles.filter(p => p.alpha > 0);
+    rafId = requestAnimationFrame(animate);
+  }
+  animate();
+
+  // Stop after 6 seconds
+  setTimeout(() => {
+    clearInterval(burstId);
+    cancelAnimationFrame(rafId);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }, 6000);
 }
 
 

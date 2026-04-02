@@ -9,16 +9,17 @@ body {
   color: white;
   font-family: Arial, sans-serif;
   direction: rtl;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px;
+  padding: 8px 12px;
 }
 
 h1 {
-  font-size: 2rem;
-  margin-bottom: 12px;
+  font-size: 1.5rem;
+  margin-bottom: 6px;
 }
 
 /* --------------------------------
@@ -27,8 +28,8 @@ h1 {
 #hud {
   display: flex;
   gap: 48px;
-  font-size: 1.3rem;
-  margin-bottom: 20px;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
 }
 
 /* --------------------------------
@@ -37,17 +38,19 @@ h1 {
 #board {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  width: min(95vw, 900px);
+  gap: 8px;
+  width: 98vw;
+  flex: 1;
+  align-content: stretch;
 }
 
 /* --------------------------------
    Individual card (3-D flip)
 -------------------------------- */
 .card {
-  aspect-ratio: 3 / 4;
   perspective: 1000px;
   cursor: pointer;
+  height: calc((100vh - 80px) / 2.4);
 }
 
 .card-inner {
@@ -94,14 +97,31 @@ h1 {
 
 .card.matched .card-inner {
   border-radius: 10px;
-  box-shadow: 0 0 12px 4px #FFD700;
+  box-shadow: 0 0 12px 4px #4CAF50;
+}
+
+/* --------------------------------
+   Fireworks canvas
+-------------------------------- */
+#fireworks {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
 }
 
 /* --------------------------------
    Victory overlay
 -------------------------------- */
 #victory {
-  margin-top: 28px;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.45);
   text-align: center;
 }
 
@@ -111,7 +131,7 @@ h1 {
 
 #victory-message {
   font-size: 1.5rem;
-  color: #FFD700;
+  color: #4CAF50;
   white-space: pre-line;
   margin-bottom: 20px;
   line-height: 1.7;
