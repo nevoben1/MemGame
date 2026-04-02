@@ -1,145 +1,230 @@
-
-
 import tkinter as tk
+from tkinter import messagebox
 from PIL import Image, ImageTk
 import random
 import os
-import tkinter.messagebox
+import time
 
-# -------------------------------
-# הגדרות
-# -------------------------------
-NUM_PAIRS = 5
-ROWS = 2
-COLS = 5
-folder = "images"
+# ================================
+# CONFIGURATION — edit freely
+# ================================
+NUM_PAIRS       = 5
+ROWS            = 2
+COLS            = 5
+IMAGES_DIR      = "images"
+PADDING         = 40
+FLIP_DELAY      = 800   # ms before non-match cards flip back
+
+VICTORY_TITLE   = "כל הכבוד!"
+VICTORY_MESSAGE = "happy birthday shachar i love you\n\nסיימת ב-{steps} צעדים ו-{time}!"
+
 valid_extensions = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".jfif")
 
-root = tk.Tk()
-root.title("משחק זיכרון ❤️")
-root.attributes("-fullscreen", True)
 
-screen_width = root.winfo_screenwidth()
-screen_height = root.winfo_screenheight()
+# ================================
+# GameBoard class
+# ================================
+class GameBoard:
+    def __init__(self, root: tk.Tk):
+        self.root = root
+        self._images = []
+        self._back_image = None
+        self._buttons = []
+        self._cards = []
+        self._revealed = []
+        self._matched = []
+        self._first = None
+        self._second = None
+        self._lock = False
+        self._attempts = 0
+        self._start_time = 0.0
+        self._timer_id = None
 
-CARD_WIDTH = screen_width // COLS - 40
-CARD_HEIGHT = screen_height // ROWS - 40
-CARD_SIZE = (CARD_WIDTH, CARD_HEIGHT)
+        self._load_images()
+        self._build_ui()
+        self._new_game()
 
-# -------------------------------
-# טעינת תמונות
-# -------------------------------
-files = [f for f in os.listdir(folder)
-         if f.lower().endswith(valid_extensions) and f.lower() != "back.png"]
+    def _load_images(self):
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        card_w = (screen_w - PADDING * (COLS + 1)) // COLS
+        card_h = (screen_h - PADDING * (ROWS + 1)) // ROWS
+        self._card_size = (card_w, card_h)
 
-if len(files) < NUM_PAIRS:
-    raise ValueError(f"צריך לפחות {NUM_PAIRS} תמונות בתיקייה!")
+        files = [
+            f for f in os.listdir(IMAGES_DIR)
+            if f.lower().endswith(valid_extensions) and f.lower() != "back.png"
+        ]
+        if len(files) < NUM_PAIRS:
+            raise ValueError(f"צריך לפחות {NUM_PAIRS} תמונות בתיקייה!")
+        files = files[:NUM_PAIRS]
 
-files = files[:NUM_PAIRS]
+        self._images = []
+        for file in files:
+            path = os.path.join(IMAGES_DIR, file)
+            img = Image.open(path).resize(self._card_size)
+            self._images.append(ImageTk.PhotoImage(img))
 
-images = []
-for file in files:
-    path = os.path.join(folder, file)
-    img = Image.open(path).resize(CARD_SIZE)
-    images.append(ImageTk.PhotoImage(img))
+        back_path = os.path.join(IMAGES_DIR, "back.png")
+        if os.path.exists(back_path):
+            back_raw = Image.open(back_path).resize(self._card_size)
+        else:
+            back_raw = Image.new("RGB", self._card_size, color="gray")
+        self._back_image = ImageTk.PhotoImage(back_raw)
 
-back_path = os.path.join(folder, "back.png")
-if os.path.exists(back_path):
-    back_image_raw = Image.open(back_path).resize(CARD_SIZE)
-else:
-    back_image_raw = Image.new("RGB", CARD_SIZE, color="gray")
-back_image = ImageTk.PhotoImage(back_image_raw)
+    def _build_ui(self):
+        self.root.configure(bg="#222")
 
-# -------------------------------
-# הכפלת קלפים וערבוב
-# -------------------------------
-cards = images * 2
-random.shuffle(cards)
-NUM_CARDS = NUM_PAIRS * 2
+        # HUD row
+        hud = tk.Frame(self.root, bg="#222")
+        hud.pack(pady=(10, 0))
 
-buttons = []
-revealed = [False] * NUM_CARDS
-matched = [False] * NUM_CARDS
-first = None
-second = None
-lock = False
-attempts = 0  # ספירת צעדים
+        self._attempts_label = tk.Label(
+            hud, text="ניסיונות: 0",
+            font=("Arial", 22), bg="#222", fg="white"
+        )
+        self._attempts_label.pack(side="left", padx=40)
 
-# -------------------------------
-# פונקציות משחק
-# -------------------------------
-def click(index):
-    global first, second, lock, attempts
+        self._timer_label = tk.Label(
+            hud, text="זמן: 00:00",
+            font=("Arial", 22), bg="#222", fg="white"
+        )
+        self._timer_label.pack(side="left", padx=40)
 
-    if lock or revealed[index] or matched[index]:
-        return
+        # Card board
+        self._board_frame = tk.Frame(self.root, bg="#333")
+        self._board_frame.pack(expand=True)
 
-    buttons[index].config(image=cards[index])
-    revealed[index] = True
+        for r in range(ROWS):
+            self._board_frame.grid_rowconfigure(r, weight=1)
+        for c in range(COLS):
+            self._board_frame.grid_columnconfigure(c, weight=1)
 
-    if not first:
-        first = index
-    else:
-        second = index
-        lock = True
-        attempts += 1
-        attempts_label.config(text=f"ניסיונות: {attempts}")
-        root.after(800, check)
-
-def check():
-    global first, second, lock
-
-    if cards[first] == cards[second]:
-        matched[first] = True
-        matched[second] = True
-    else:
-        buttons[first].config(image=back_image)
-        buttons[second].config(image=back_image)
-        revealed[first] = False
-        revealed[second] = False
-
-    first_index = first
-    second_index = second
-    first = None
-    second = None
-    lock = False
-
-    if all(matched):
-        # -------------------------------
-        # מסך ניצחון מותאם אישית
-        # -------------------------------
-        tk.messagebox.showinfo(
-            "🎉 כל הכבוד! 🎉",
-            "happy birthday shachar i love you\n\n" +
-            f"סיימת את המשחק ב-{attempts} צעדים!"
+        # Play Again button (hidden until win)
+        self._play_again_btn = tk.Button(
+            self.root, text="שחק שוב",
+            font=("Arial", 24), bg="#444", fg="white",
+            command=self._new_game
         )
 
-# -------------------------------
-# יצירת לוח קלפים
-# -------------------------------
-board_frame = tk.Frame(root, bg="#333")
-board_frame.pack(expand=True)
+    def _new_game(self):
+        # Cancel running timer
+        if self._timer_id is not None:
+            self.root.after_cancel(self._timer_id)
+            self._timer_id = None
 
-for i in range(NUM_CARDS):
-    btn = tk.Button(board_frame, image=back_image,
-                    width=CARD_SIZE[0], height=CARD_SIZE[1],
-                    command=lambda i=i: click(i),
-                    relief="raised", bd=4)
-    btn.grid(row=i // COLS, column=i % COLS, padx=10, pady=10, sticky="nsew")
-    buttons.append(btn)
+        # Destroy old buttons
+        for btn in self._buttons:
+            btn.destroy()
 
-# התאמת גריד לגודל החלון
-for r in range(ROWS):
-    board_frame.grid_rowconfigure(r, weight=1)
-for c in range(COLS):
-    board_frame.grid_columnconfigure(c, weight=1)
+        # Shuffle cards
+        self._cards = self._images * 2
+        random.shuffle(self._cards)
+        num_cards = NUM_PAIRS * 2
 
-# -------------------------------
-# תצוגת ניסיונות
-# -------------------------------
-attempts_label = tk.Label(root, text=f"ניסיונות: {attempts}", font=("Arial", 24), bg="#222", fg="white")
-attempts_label.pack(pady=20)
+        # Reset state
+        self._revealed = [False] * num_cards
+        self._matched  = [False] * num_cards
+        self._first    = None
+        self._second   = None
+        self._lock     = False
+        self._attempts = 0
 
-# -------------------------------
-root.mainloop()
+        # Reset labels
+        self._attempts_label.config(text="ניסיונות: 0", font=("Arial", 22), fg="white")
+        self._timer_label.config(text="זמן: 00:00")
 
+        # Hide victory elements
+        self._play_again_btn.pack_forget()
+
+        # Create buttons
+        self._buttons = []
+        for i in range(num_cards):
+            btn = tk.Button(
+                self._board_frame,
+                image=self._back_image,
+                width=self._card_size[0],
+                height=self._card_size[1],
+                command=lambda i=i: self._on_card_click(i),
+                relief="raised", bd=4
+            )
+            btn.grid(row=i // COLS, column=i % COLS, padx=10, pady=10, sticky="nsew")
+            self._buttons.append(btn)
+
+        # Start timer
+        self._start_time = time.monotonic()
+        self._tick()
+
+    def _tick(self):
+        elapsed = time.monotonic() - self._start_time
+        minutes = int(elapsed) // 60
+        seconds = int(elapsed) % 60
+        self._timer_label.config(text=f"זמן: {minutes:02d}:{seconds:02d}")
+        self._timer_id = self.root.after(1000, self._tick)
+
+    def _on_card_click(self, index):
+        if self._lock or self._revealed[index] or self._matched[index]:
+            return
+
+        self._buttons[index].config(image=self._cards[index])
+        self._revealed[index] = True
+
+        if self._first is None:
+            self._first = index
+        else:
+            self._second = index
+            self._lock = True
+            self._attempts += 1
+            self._attempts_label.config(text=f"ניסיונות: {self._attempts}")
+            self.root.after(FLIP_DELAY, self._check_match)
+
+    def _check_match(self):
+        if self._cards[self._first] == self._cards[self._second]:
+            self._matched[self._first] = True
+            self._matched[self._second] = True
+        else:
+            self._buttons[self._first].config(image=self._back_image)
+            self._buttons[self._second].config(image=self._back_image)
+            self._revealed[self._first] = False
+            self._revealed[self._second] = False
+
+        self._first = None
+        self._second = None
+        self._lock = False
+
+        if all(self._matched):
+            self._on_win()
+
+    def _on_win(self):
+        # Stop timer
+        if self._timer_id is not None:
+            self.root.after_cancel(self._timer_id)
+            self._timer_id = None
+
+        elapsed = time.monotonic() - self._start_time
+        minutes = int(elapsed) // 60
+        seconds = int(elapsed) % 60
+        time_str = f"{minutes:02d}:{seconds:02d}"
+
+        msg = VICTORY_MESSAGE.format(steps=self._attempts, time=time_str)
+        self._attempts_label.config(
+            text=msg,
+            font=("Arial", 20), fg="#FFD700"
+        )
+        self._play_again_btn.pack(pady=20)
+
+
+# ================================
+# Entry point
+# ================================
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.title("משחק זיכרון ❤️")
+    root.attributes("-fullscreen", True)
+
+    if not os.path.isdir(IMAGES_DIR):
+        messagebox.showerror("תיקייה חסרה", f"לא נמצאה תיקיית תמונות: '{IMAGES_DIR}'")
+        raise SystemExit(1)
+
+    GameBoard(root)
+    root.mainloop()
