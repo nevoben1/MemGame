@@ -9,11 +9,11 @@ const CONFIG = {
   // Paths to card face images (must have exactly numPairs entries).
   // Any extension works: .jpg, .jpeg, .png, .gif, .bmp, .jfif
   imagePaths: [
-    "images/1.jfif",
-    "images/2.jfif",
-    "images/3.jfif",
-    "images/4.jfif",
-    "images/5.jfif",
+    "images/1.jpg",
+    "images/2.jpg",
+    "images/3.jpg",
+    "images/4.jpg",
+    "images/5.jpg",
   ],
   cardBackPath: "images/back.png",
   victoryMessage: (steps, time) =>
